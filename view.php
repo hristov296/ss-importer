@@ -24,8 +24,10 @@ function ss_import_view() { ?>
       <li>"var1:{attr_name}" - {value} (First attribute used for variation)</li>
       <li>"var2:{attr_name}" - {value} (Second attribute used for variation)</li>
       <li>"price" - price</li>
+      <li>"sku" - sku</li>
       <li>"product_cat" - {id1},{id2},{id3}...</li>
       <li>"product_tag" - {id1},{id2},{id3}...</li>
+      <li>"prod_gallery_{n}" - image link or image id</li>
     </ul>
     <form enctype="multipart/form-data" method="post" action="<?php menu_page_url('ss-import-submit.php'); ?>" class="media-upload-form type-form validate">
       <table class="form-table">

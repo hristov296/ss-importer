@@ -111,7 +111,7 @@ class SS_Import_Submit {
             if (!empty($impost['gallery_ids'])){
               $gallery_ids = array();
               foreach ($impost['gallery_ids'] as $key => $image_url) {
-                $curr_gal_id = $this->crb_insert_attachment_from_url($image_url, $currid, $postarr['post_title'].'-00'.$key);
+                $curr_gal_id = preg_match('/(http|https)/',$image_url) ? $this->crb_insert_attachment_from_url($image_url, $currid, $postarr['post_title'].'-00'.$key) : $image_url;
                 array_push($gallery_ids, $curr_gal_id);
               }
               
@@ -147,7 +147,7 @@ class SS_Import_Submit {
           }
 
           if (!empty($impost['post_image'])) {
-            $featured_img_id = $this->crb_insert_attachment_from_url($impost['post_image'], $currid, $postarr['post_title']);
+            $featured_img_id = preg_match('/(http|https)/',$impost['post_image']) ? $this->crb_insert_attachment_from_url($impost['post_image'], $currid, $postarr['post_title']) : $impost['post_image'];
             set_post_thumbnail($currid, $featured_img_id);
           }
           if (!empty($impost['acf-field'])){
@@ -195,11 +195,6 @@ class SS_Import_Submit {
               foreach ($impost['acf-sub'] as $group_name => $group_fields) {
                   foreach ($group_fields as $field_key => $field_name) {
                       if ($field_name !== '') {
-                        //   if ($j = update_field($group_name, array($field_key => $field_name), $currid)) {
-                        //       $output .= 'Group '.$group_name.' sub field updated: '.$field_key.' - '.$field_name;
-                        //   } else {
-                        //       $output .= 'Group '.$group_name.' sub field failed: '.$field_key.' - '.$field_name;
-                        //   }
                         if ($j = update_field($group_name.'_'.$field_key, $field_name, $currid)) {
                               $output .= 'Group '.$group_name.' sub field updated: '.$field_key.' - '.$field_name;
                           } else {
@@ -229,13 +224,24 @@ class SS_Import_Submit {
         $postarr = array(
           'post_status' => 'publish',
           'post_type' => $im_post_type,
-          'tax_input' => array(
-            'product_type' => 'simple',
-            'product_cat' => $lang == 'bg' ? 'Без категория' : '',
-            'translation_priority' => $lang == 'bg' ? 'optional' : '',
-          ),
+          // 'tax_input' => array(
+          //   'product_type' => 'simple',
+          //   'product_cat' => $lang == 'bg' ? 'Без категория' : '',
+          //   'translation_priority' => $lang == 'bg' ? 'optional' : '',
+          // ),
         );
 
+        if (!empty($impost['post_id'])) {
+          $postarr['ID'] = $impost['post_id'];
+          $postarr['post_date'] = date("Y-m-d H:i:s", get_post_time('U', false, $impost['post_id']));
+          $postarr['post_date_gmt'] = date("Y-m-d H:i:s", get_post_time('U', true, $impost['post_id']));
+          $curr_post_title = get_the_title( $impost['post_id'] );
+          $curr_post_excerpt = get_the_excerpt( $impost['post_id'] );
+          $curr_post_content = get_the_content( $impost['post_id'] );
+          $postarr['post_title'] = $curr_post_title ? $curr_post_title : '' ;
+          $postarr['post_excerpt'] = $curr_post_excerpt ? $curr_post_excerpt : '' ;
+          $postarr['post_content'] = $curr_post_content ? $curr_post_content : '' ;
+        }
         if (!empty($impost['post_title'])) {
           $postarr['post_title'] = $impost['post_title'];
         }
@@ -248,6 +254,13 @@ class SS_Import_Submit {
         if (!empty($impost['menu_order'])) {
           $postarr['menu_order'] = $impost['menu_order'];
         }
+        if (!empty($impost['post_parent'])) {
+          $postarr['post_parent'] = $impost['post_parent'];
+        }
+        if (!empty($impost['post_date'])) {
+          $postarr['post_date'] = $impost['post_date'];
+        }
+  
         if (!empty($impost['meta'])) {
           foreach ($impost['meta'] as $key => $val) {
             if ($val !== '') {
@@ -256,11 +269,107 @@ class SS_Import_Submit {
           }
         }
 
+        if (!empty($impost['tax'])) {
+          foreach ($impost['tax'] as $key => $val) {
+            if ($val !== '') {
+              $postarr['tax_input'][$key] = $val;
+            }
+          }
+        }
+  
+        if ($im_post_type === 'product_variation') {
+          if (empty($impost['post_parent'])) {
+            $output .= 'Missing post_parent for product_variation on row:'.($i+1);
+            break;
+          }
+          if (empty($impost['var1'])) {
+            $output .= 'Missing var1 for product_variation on row:'.($i+1);
+            break;
+          }
+          if (empty($impost['var2'])) {
+            $output .= 'Missing var2 for product_variation on row:'.($i+1);
+            break;
+          }
+        }
+  
         $currid = wp_insert_post($postarr); // Sucction
 
         if ($currid) {
             $output .= $currid.' - '.$impost['post_title'].' - success!</br>';
 
+            if ($is_woocommerce && $im_post_type === 'product') {
+
+              $product = wc_get_product($currid);
+              $product_type = $product->get_type();
+              if (!empty($impost['product_type']) && $impost['product_type'] === 'variable') {
+                $product_type = 'variable';
+              }
+              $classname = WC_Product_Factory::get_product_classname( $currid, $product_type );
+              $product = new $classname($currid);
+  
+              if (!empty($impost['product_cat'])) {
+                $temp_arr = explode(',', $impost['product_cat']);
+                $product->set_category_ids(array_map(function($val){return (int)$val;}, $temp_arr));
+              }
+              if (!empty($impost['product_tag'])) {
+                $temp_arr = explode(',', $impost['product_tag']);
+                $product->set_tag_ids(array_map(function($val){return (int)$val;}, $temp_arr));
+              }
+              if (!empty($impost['sale_price'])) {
+                $product->set_sale_price( $impost['sale_price'] );
+              }
+              if (!empty($impost['price'])) {
+                $product->set_regular_price( $impost['price'] );
+              }
+  
+              if (!empty($impost['attribute'])) {
+                $current_atts = $product->get_attributes();
+  
+                $product->set_attributes( $this->ss_wc_attributes_sync($currid, $current_atts, $impost['attribute']), false );
+              }
+  
+              if (!empty($impost['gallery_ids'])){
+                $gallery_ids = array();
+                foreach ($impost['gallery_ids'] as $key => $image_url) {
+                  $curr_gal_id = preg_match('/(http|https)/',$image_url) ? $this->crb_insert_attachment_from_url($image_url, $currid, $postarr['post_title'].'-00'.$key) : $image_url;
+                  array_push($gallery_ids, $curr_gal_id);
+                }
+                
+                if (!empty($gallery_ids)){
+                  $product->set_gallery_image_ids($gallery_ids);
+                }
+              }
+              
+              $product->save();
+  
+            }
+  
+            if ($im_post_type === 'product_variation') {
+
+              // set the parent's attributes, if not set
+              $pr = new WC_Product_Variable($impost['post_parent']);
+              $current_atts = $pr->get_attributes();
+    
+              
+              $pr->set_attributes($this->ss_wc_attributes_sync($impost['post_parent'], $current_atts, $impost['attribute'], true));
+              $cl = new WC_Product_Data_Store_CPT();
+              $cl->update($pr);
+  
+              $variation = new WC_Product_Variation($currid);
+              $variation->set_attributes(array(
+                $impost['var1']['name'] => $impost['var1']['value'],
+                $impost['var2']['name'] => $impost['var2']['value'],
+              ));
+              if (!empty($impost['price'])) {
+                $variation->set_regular_price( $impost['price'] );
+              }
+              $variation->save();
+            }
+  
+            if (!empty($impost['post_image'])) {
+              $featured_img_id = preg_match('/(http|https)/',$impost['post_image']) ? $this->crb_insert_attachment_from_url($impost['post_image'], $currid, $postarr['post_title']) : $impost['post_image'];
+              set_post_thumbnail($currid, $featured_img_id);
+            }
             if (!empty($impost['acf-field'])){
               foreach ($impost['acf-field'] as $key => $val) {
                 if ($val !== '') {
@@ -289,6 +398,34 @@ class SS_Import_Submit {
               }
             }
 
+            if (!empty($impost['acf-table'])) {
+              foreach ($impost['acf-table'] as $table_name => $table_rows) {
+                $field = acf_get_field($table_name);
+                foreach ($table_rows as $row_key => $values) {
+                  $array_to_update = array();
+                  foreach( $field['sub_fields'] as $key => $sub_field) {
+                    $array_to_update[$sub_field['name']] = $values[$key];
+                  }
+                  add_row($table_name, $array_to_update, $currid);
+                }
+              }
+            }
+            
+            if (!empty($impost['acf-sub'])) {
+                foreach ($impost['acf-sub'] as $group_name => $group_fields) {
+                    foreach ($group_fields as $field_key => $field_name) {
+                        if ($field_name !== '') {
+                          if ($j = update_field($group_name.'_'.$field_key, $field_name, $currid)) {
+                                $output .= 'Group '.$group_name.' sub field updated: '.$field_key.' - '.$field_name;
+                            } else {
+                                error_log(print_r($j, true));
+                                $output .= 'Group '.$group_name.' sub field failed: '.$field_key.' - '.$field_name;
+                            }
+                        }
+                    }
+                }
+            }
+            
             $inserted[$lang] = $currid;
         }
       }
