@@ -101,6 +101,9 @@ class SS_Import_Submit {
             if (!empty($impost['price'])) {
               $product->set_regular_price( $impost['price'] );
             }
+            if (!empty($impost['sku'])) {
+              $product->set_sku( $impost['sku'] );
+            }
 
             if (!empty($impost['attribute'])) {
               $current_atts = $product->get_attributes();
@@ -142,6 +145,9 @@ class SS_Import_Submit {
             ));
             if (!empty($impost['price'])) {
               $variation->set_regular_price( $impost['price'] );
+            }
+            if (!empty($impost['sku'])) {
+              $variation->set_sku( $impost['sku'] );
             }
             $variation->save();
           }
@@ -321,6 +327,9 @@ class SS_Import_Submit {
               if (!empty($impost['price'])) {
                 $product->set_regular_price( $impost['price'] );
               }
+              if (!empty($impost['sku'])) {
+                $product->set_sku( $impost['sku'] );
+              }
   
               if (!empty($impost['attribute'])) {
                 $current_atts = $product->get_attributes();
@@ -362,6 +371,9 @@ class SS_Import_Submit {
               ));
               if (!empty($impost['price'])) {
                 $variation->set_regular_price( $impost['price'] );
+              }
+              if (!empty($impost['sku'])) {
+                $variation->set_sku( $impost['sku'] );
               }
               $variation->save();
             }
