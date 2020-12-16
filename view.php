@@ -8,6 +8,7 @@ function ss_import_view() { ?>
     <ul>
       <li>"post_id" - ID, for updating posts</li>
       <li>"post_title" - Title</li>
+      <li>"post_image" - Image id or Image link</li>
       <li>"post_content" - Post Content</li>
       <li>"post_excerpt" - Post Excerpt</li>
       <li>"post_parent" - Post Parent (for variations)</li>
